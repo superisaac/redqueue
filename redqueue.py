@@ -36,16 +36,18 @@ class Queue(object):
 
     def rotate_log(self):
         if self.log:
-            self.log.close()
+            os.close(self.log.fileno())
         self.log = open(os.path.join(options.logdir,
                                      '%s-%d.log' % (urllib.quote_plus(self.key),
                                                     time.time())), 'ab')
 
+
     def enqueue(self, timeout, data):
         self._queue.appendleft((timeout, data))
-        self.log.write('S %d %d\r\n%s\r\n' % (timeout,
-                                              len(data), data))
+        os.write(self.log.fileno(), 'S %d %d\r\n%s\r\n' % (timeout,
+                                                    len(data), data))
         self.log.flush()
+        os.fsync(self.log.fileno())
 
         if len(self._queue) > 128:
             logging.warn('queue size(%s) for key %s is too big' %
@@ -57,8 +59,10 @@ class Queue(object):
                 timeout, data = self._queue.pop()
             except IndexError:
                 return None
-            self.log.write('G\r\n')
+            os.write(self.log.fileno(), 'G\r\n')
             self.log.flush()
+            os.fsync(self.log.fileno())
+
             if (len(self._queue) == 0 and
                 self.log.tell() >= LOG_CAPACITY):
                 self.rotate_log()
