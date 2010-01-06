@@ -9,7 +9,8 @@ Redqueue is free and unencumbered public domain software.
 
 == INSTALL
  Install tornado and (optional) python-memcached for client testing
-
+ 
+ Get the source from 
  git@github.com:superisaac/redqueue.git
 
  % python redqueue.py
