@@ -109,7 +109,7 @@ class Protocol(object):
         if not data_required:
             self.wait_for_line()
 
-    def handle_unknown(self, **args):
+    def handle_unknown(self, *args):
         self.stream.write("CLIENT_ERROR bad command line format\r\n")
 
     def handle_set(self, key, flags, exptime, bytes, *args):
