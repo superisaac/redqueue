@@ -23,7 +23,7 @@ Redqueue is free and unencumbered public domain software.
     >>> mc.set('abc', 123)
     >>> mc.set('config:reserv', 1)
     >>> mc.get('abc')
-    >>> mc.get('xxx')  # It must be None
+    >>> mc.get('abc')  # It must be None
     >>> mc.delete('abc')
 
     If client crashed or even server crashed, the key 'abc''s value

@@ -7,7 +7,6 @@
 # Author: Zeng Ke  superisaac.ke at gmail dot com
 #
 ####################################################################
-
 import re, os, sys
 import socket
 import logging
@@ -102,7 +101,6 @@ class Queue(object):
             logging.warn('queue size(%s) for key %s is too big' %
                          (len(self._queue), self.key))
 
-
     def enqueue(self, timeout, data):
         self._queue.appendleft((timeout, data))
 
@@ -192,7 +190,7 @@ class Protocol(object):
             'delete': self.handle_delete}
         self.wait_for_line()
         self.reservation = False
-        self.reserved_key = None
+        self.resved_keys = set()
 
     def set_reservation(self, value):
         orig_reservation = self.reservation
@@ -201,15 +199,19 @@ class Protocol(object):
             logging.info('Set reservation to be %s' % self.reservation)
             self.use_key()
         
-    def use_key(self):
-        if self.reserved_key:
-            server.get_queue(self.reserved_key).use(self.protocol_id)
-            self.reserved_key = None
+    def use_key(self, key=None):
+        if key is None:
+            for k in self.resved_keys:
+                server.get_queue(k).use(self.protocol_id)
+            self.resved_keys = set()
+        elif key in self.resved_keys:
+            server.get_queue(key).use(self.protocol_id)
+            self.resved_keys.remove(key)
 
     def _return_data(self):
-        if self.reserved_key:
-            server.get_queue(self.reserved_key).return_(self.protocol_id)
-            self.reserved_key = None
+        for key in self.resved_keys:
+            server.get_queue(key).return_(self.protocol_id)
+        self.resved_keys = set()
 
     def wait_for_line(self):
         self.stream.read_until('\r\n', self.line_received)
@@ -236,18 +238,15 @@ class Protocol(object):
                 self.set_reservation(data)
             else:
                 server.get_queue(key).enqueue(exptime, data)
-
             self.stream.write('STORED\r\n')
             self.wait_for_line()
-
         self.stream.read_bytes(bytes + 2, on_set_data)
         return True
 
     def handle_get(self, key, *args):
-        if self.reservation and self.reserved_key:
+        if self.reservation and (key in self.resved_keys):
             self.stream.write('END\r\n')
             return
-        
         prot_id = None
         if self.reservation:
             prot_id = self.protocol_id
@@ -256,13 +255,13 @@ class Protocol(object):
         if t:
             timeout, data = t
             if self.reservation:
-                self.reserved_key = key
+                self.resved_keys.add(key)
             self.stream.write('VALUE %s 0 %d\r\n%s\r\n' % (key, len(data), data))
         self.stream.write('END\r\n')
 
     def handle_delete(self, key, *args):
-        if key == self.reserved_key:
-            self.use_key()
+        if key in self.resved_keys:
+            self.use_key(key)
             self.stream.write('DELETED\r\n')
         else:
             self.stream.write('NOT_DELETED\r\n')
@@ -270,7 +269,7 @@ class Protocol(object):
 if __name__ == '__main__':
     tornado.options.parse_command_line()
     if not os.path.isdir(options.logdir):
-        logging.error('Log directory %s does not exits' % options.logdir)
+        logging.error('Log directory %s does not exist.' % options.logdir)
         sys.exit(1)
     server = Server(options.logdir)
     server.scan_logs()

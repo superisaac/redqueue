@@ -52,14 +52,13 @@ def test_reservation():
     clean_cache('abc')
     clean_cache('def')
     mc.set('abc', 'I')
-    mc.set('def', 'love')
+    mc.set('abc', 'really')
     mc.set('config:reserv', 1)
     assert(mc.get('abc') == 'I')
     assert(mc.get('abc') is None)
-    assert(mc.get('def') is None)
     mc.delete('abc')
     mc.set('config:reserv', 0)
-    assert(mc.get('def') == 'love')
+    assert(mc.get('abc') == 'really')
     print 'test reservation ok'
 
 def test_reservation_close():
@@ -102,6 +101,6 @@ if __name__ == '__main__':
     test_timeout()
     test_reservation()
     test_reservation_close()
-    #test_server_error()
+    test_server_error()
     
 
