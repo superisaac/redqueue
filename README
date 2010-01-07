@@ -2,7 +2,7 @@
 Redqueue is a light weight queue server that speaks memcache protocol
 and provides persistent queue based on log. It is writen in python
 using the high performance tornado frameworks, currently all the
-functions are in a single file which contains only less than 200 lines
+functions are in a single file which contains only less than 300 lines
 of effective code.
 
 Redqueue is free and unencumbered public domain software.
