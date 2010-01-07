@@ -21,18 +21,24 @@ from tornado.options import define, options
 
 define('host', default="0.0.0.0", help="The binded ip host")
 define('port', default=11211, type=int, help='The port to be listened')
-define('logdir', default='log', help='the directory to put logs')
-
+define('logdir', default='log', help='The directory to put logs')
+define('reliable', default='no', help='Store data to log files, options: (no, yes, sync)')
 LOG_CAPACITY = 1024 * 1024 # 1 mega bytes for each chunk
 
 class Server(object):
     def __init__(self, logdir):
         self.queue_collection = {}
         self.logdir = logdir
+        if options.reliable in ('yes', 'sync'):
+            self.queue_class = ReliableQueue
+            if options.reliable == 'sync':
+                ReliableQueue.addlog = ReliableQueue.addlog_sync
+        else:
+            self.queue_class = Queue
 
     def get_queue(self, key, auto_create=True):
         if key not in self.queue_collection and auto_create:
-            self.queue_collection[key] = Queue(key)
+            self.queue_collection[key] = self.queue_class(key)
         return self.queue_collection.get(key)
 
     def handle_accept(self, fd, events):
@@ -63,52 +69,38 @@ class Server(object):
         for key, tm in queue_fns.iteritems():
             ukey = urllib.unquote_plus(key)
             logging.info('Restoring queue %s ...' % ukey)
-            queue = Queue(ukey)
+            queue = self.get_queue(ukey)
             queue.load_from_log(os.path.join(self.logdir,
                                              '%s-%d.log' % (key, tm)))
-            self.queue_collection[ukey] = queue
+            #self.queue_collection[ukey] = queue
         logging.info('Redqueue is ready to serve.')
 
 server = None
+
 #TODO: binary log
 class Queue(object):
     def __init__(self, key):
         self.key = key
         self._queue = deque()
         self.log = None
-        self.rotate_log()
         self.borrowing = {}
+        self.rotate_log()
 
     def addlog(self, w):
-        os.write(self.log.fileno(), w)
-        self.log.flush()
-        os.fsync(self.log.fileno())
-        
+        pass
     def rotate_log(self):
-        if self.log:
-            self.log.close()
-        fn = os.path.join(server.logdir,
-                          '%s-%d.log' % (urllib.quote_plus(self.key),
-                                         time.time()))
-        self.log = open(fn, 'ab')
+        pass
 
     def return_(self, prot_id):
         timeout, data = self.borrowing.pop(prot_id)        
         self._queue.appendleft((timeout, data))
         self.addlog('R %s\r\n' % prot_id)
 
-        if len(self._queue) > 128:
-            logging.warn('queue size(%s) for key %s is too big' %
-                         (len(self._queue), self.key))
-
     def enqueue(self, timeout, data):
         self._queue.appendleft((timeout, data))
 
         self.addlog('S %d %d\r\n%s\r\n' % (timeout,
                                            len(data), data))
-        if len(self._queue) > 128:
-            logging.warn('queue size(%s) for key %s is too big' %
-                         (len(self._queue), self.key))
 
     def use(self, prot_id):
         if prot_id in self.borrowing:
@@ -126,10 +118,7 @@ class Queue(object):
             else:
                 self.addlog('B %s\r\n' % prot_id)
 
-            if (len(self._queue) == 0 and
-                len(self.borrowing) == 0 and
-                self.log.tell() >= LOG_CAPACITY):
-                self.rotate_log()
+            self.rotate_log()
             if timeout > 0 and timeout < time.time():
                 continue
             if prot_id:
@@ -174,11 +163,32 @@ class Queue(object):
                 logging.error('Bad format for log file %s' % logpath)
 
         for t in self.borrowing.itervalues():
-            # The order is not important
             self._queue.append(t)
         self.borrowing = {}
         logfile.close()
 
+class ReliableQueue(Queue):
+    def addlog(self, w):
+        os.write(self.log.fileno(), w)
+        self.log.flush()
+
+    def addlog_sync(self, w):
+        os.write(self.log.fileno(), w)
+        self.log.flush()
+        #os.fdatasync(self.log.fileno())
+        os.fsync(self.log.fileno())
+        
+    def rotate_log(self):
+        if self.log is None or (len(self._queue) == 0 and
+                                len(self.borrowing) == 0 and
+                                self.log.tell() >= LOG_CAPACITY):
+            if self.log:
+                self.log.close()
+            fn = os.path.join(server.logdir,
+                              '%s-%d.log' % (urllib.quote_plus(self.key),
+                                             time.time()))
+            self.log = open(fn, 'ab')
+        
 class Protocol(object):
     def __init__(self, stream):
         self.protocol_id = str(id(self))

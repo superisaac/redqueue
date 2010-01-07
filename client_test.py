@@ -96,11 +96,21 @@ def test_server_error():
     else:
         print mc.get('xyz')
 
+def test_performance():
+    ot = time.time()
+    for _ in xrange(100):
+        for i in xrange(100):
+            mc.set('perf', i)
+        for i in xrange(100):
+            mc.get('perf')
+    print time.time() - ot
+        
 if __name__ == '__main__':
     test_queue()
     test_timeout()
     test_reservation()
     test_reservation_close()
     test_server_error()
+    test_performance()
     
 
