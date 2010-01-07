@@ -263,7 +263,9 @@ class Protocol(object):
     def handle_delete(self, key, *args):
         if key == self.reserved_key:
             self.use_key()
-        self.stream.write('DELETED\r\n')
+            self.stream.write('DELETED\r\n')
+        else:
+            self.stream.write('NOT_DELETED\r\n')
 
 if __name__ == '__main__':
     tornado.options.parse_command_line()
