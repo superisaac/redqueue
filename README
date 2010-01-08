@@ -7,16 +7,17 @@ of effective code.
 
 Redqueue is free and unencumbered public domain software.
 
-== INSTALL
+== Install and Run
  Install tornado and (optional) python-memcached for client testing
  
  Get the source from 
  git@github.com:superisaac/redqueue.git
-
- % python redqueue.py
+ % python setup.py install
+ % mkdir -p log
+ % redqueue_server.py
  
  For more options please run
- % python redqueue.py --help
+ % redqueue_server.py --help
 
 == Reserve/delete mode
    Now the program is able to behave like beanstalk to handle client crash, yet it uses memcached protocol
