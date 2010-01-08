@@ -12,8 +12,14 @@ Redqueue is free and unencumbered public domain software.
  
  Get the source from 
  git@github.com:superisaac/redqueue.git
+ 
+ Install
  % python setup.py install
+
+ Make the log dir
  % mkdir -p log
+
+ Run the server
  % redqueue_server.py
  
  For more options please run

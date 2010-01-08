@@ -14,6 +14,7 @@ from tornado import ioloop
 import tornado.options
 from tornado.options import define, options
 from redqueue.server import Server
+from redqueue import task
 
 define('host', default="0.0.0.0", help="The binded ip host")
 define('port', default=11211, type=int, help='The port to be listened')
@@ -28,6 +29,7 @@ def main():
         sys.exit(1)
     server = Server(options.logdir, options.reliable)
     server.start(options.host, options.port)
+    task.run_all(server)
     ioloop.IOLoop.instance().start()
 
 if __name__ == '__main__':

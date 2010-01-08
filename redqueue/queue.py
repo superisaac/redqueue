@@ -13,9 +13,6 @@ import time
 import urllib
 from collections import deque
 
-from tornado import iostream
-from tornado import ioloop
-
 LOG_CAPACITY = 1024 * 1024 # 1 mega bytes for each chunk
 
 #TODO: binary log
@@ -31,38 +28,53 @@ class Queue(object):
     def rotate_log(self):
         pass
 
-    def return_(self, prot_id):
+    def give_back(self, prot_id):
+        """ Give the elememt borrowed by prot_id back for future calling"""
         timeout, data = self.borrowing.pop(prot_id)        
         self._queue.appendleft((timeout, data))
         self.addlog('R %s\r\n' % prot_id)
 
-    def enqueue(self, timeout, data):
+    def give(self, timeout, data):
         self._queue.appendleft((timeout, data))
         self.addlog('S %d %d\r\n%s\r\n' % (timeout,
                                            len(data), data))
 
     def use(self, prot_id):
+        """ Mark the element borrowed by prot_id used
+        """
         if prot_id in self.borrowing:
             self.addlog("U %s\r\n" % prot_id)
             del self.borrowing[prot_id]
         
-    def dequeue(self, prot_id=None):
+    def reserve(self, prot_id):
+        """ Reserve an element by prot_id and return it later, or the
+        server will recycle it"""
         while True:
             try:
                 timeout, data = self._queue.pop()
             except IndexError:
                 return None
-            if prot_id is None:
-                self.addlog('G\r\n')
-            else:
-                self.addlog('B %s\r\n' % prot_id)
+            self.addlog('B %s\r\n' % prot_id)
 
             self.rotate_log()
             if timeout > 0 and timeout < time.time():
                 continue
-            if prot_id:
-                assert prot_id not in self.borrowing
-                self.borrowing[prot_id] = (timeout, data)
+            assert prot_id not in self.borrowing
+            self.borrowing[prot_id] = (timeout, data)
+            return timeout, data
+
+    def take(self):
+        """ Take an element away and never return it
+        """
+        while True:
+            try:
+                timeout, data = self._queue.pop()
+            except IndexError:
+                return None
+            self.addlog('G\r\n')
+            self.rotate_log()
+            if timeout > 0 and timeout < time.time():
+                continue
             return timeout, data
 
     def load_from_log(self, logpath):

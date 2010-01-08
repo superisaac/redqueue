@@ -42,7 +42,6 @@ class MemcacheServer(object):
         ioloop.IOLoop.instance().add_handler(self._sock.fileno(),
                                              self.handle_accept,
                                              ioloop.IOLoop.READ)
-
 class MemcacheProtocol(object):
     def __init__(self, stream):
         self.protocol_id = str(id(self))
@@ -65,6 +64,7 @@ class MemcacheProtocol(object):
             self.use_key()
 
     def use_key(self, key=None):
+        """ Mark all reserved keys or the specified key as used """
         if key is None:
             for k in self.resved_keys:
                 self.server.queue_factory.get_queue(k).use(self.protocol_id)
@@ -75,7 +75,7 @@ class MemcacheProtocol(object):
 
     def _return_data(self):
         for key in self.resved_keys:
-            self.server.queue_factory.get_queue(key).return_(self.protocol_id)
+            self.server.queue_factory.get_queue(key).give_back(self.protocol_id)
         self.resved_keys = set()
 
     def wait_for_line(self):
@@ -102,7 +102,7 @@ class MemcacheProtocol(object):
             if key == 'config:reserv':
                 self.set_reservation(data)
             else:
-                self.server.queue_factory.get_queue(key).enqueue(exptime, data)
+                self.server.queue_factory.get_queue(key).give(exptime, data)
             self.stream.write('STORED\r\n')
             self.wait_for_line()
         self.stream.read_bytes(bytes + 2, on_set_data)
@@ -114,8 +114,13 @@ class MemcacheProtocol(object):
         prot_id = None
         if self.reservation:
             prot_id = self.protocol_id
-        q = self.server.queue_factory.get_queue(key)
-        t = q and q.dequeue(prot_id=prot_id) or None
+        q = self.server.queue_factory.get_queue(key, auto_create=False)
+        t = None
+        if q:
+            if self.reservation:
+                t = q.reserve(prot_id=prot_id)
+            else:
+                t = q.take()
         if t:
             if self.reservation:
                 self.resved_keys.add(key)
