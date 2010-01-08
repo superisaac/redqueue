@@ -196,6 +196,7 @@ class Protocol(object):
         self.stream.set_close_callback(self._return_data)
         self.route = {
             'get': self.handle_get,
+            'gets': self.handle_gets,
             'set': self.handle_set,
             'delete': self.handle_delete}
         self.wait_for_line()
@@ -208,7 +209,7 @@ class Protocol(object):
         if orig_reservation != self.reservation:
             logging.info('Set reservation to be %s' % self.reservation)
             self.use_key()
-        
+
     def use_key(self, key=None):
         if key is None:
             for k in self.resved_keys:
@@ -253,22 +254,37 @@ class Protocol(object):
         self.stream.read_bytes(bytes + 2, on_set_data)
         return True
 
-    def handle_get(self, key, *args):
+    def _get_data(self, key):
         if self.reservation and (key in self.resved_keys):
-            self.stream.write('END\r\n')
-            return
+            return None
         prot_id = None
         if self.reservation:
             prot_id = self.protocol_id
         q = server.get_queue(key)
         t = q and q.dequeue(prot_id=prot_id) or None
         if t:
-            timeout, data = t
             if self.reservation:
                 self.resved_keys.add(key)
-            self.stream.write('VALUE %s 0 %d\r\n%s\r\n' % (key, len(data), data))
-        self.stream.write('END\r\n')
+            return t[1] # t is a tuple of (timeout, data)
 
+    def handle_get(self, *keys):
+        for key in keys:
+            data  = self._get_data(key)
+            if data:
+                self.stream.write('VALUE %s 0 %d\r\n%s\r\n' % (key, len(data), data))
+        self.stream.write('END\r\n')
+        
+    def handle_gets(self, *keys):
+        """ Gets here is like a poll(), return the first non-empty queue
+        number, so that a client can wait several queues.
+        """
+        for key in keys:
+            data = self._get_data(key)
+            if data:
+                self.stream.write('VALUE %s 0 %d\r\n%s\r\n' % (key, len(data), data))
+                break
+        self.stream.write('END\r\n')
+                
     def handle_delete(self, key, *args):
         if key in self.resved_keys:
             self.use_key(key)

@@ -96,18 +96,34 @@ def test_server_error():
     else:
         print mc.get('xyz')
 
+def test_get_multi():
+    clean_cache('abc')
+    clean_cache('def')
+    clean_cache('ghi')
+    clean_cache('jkl')
+    
+    mc.set('def', 'I')
+    mc.set('abc', 'love')
+    mc.set('ghi', 'it')
+    assert(mc.get('def') == 'I')
+    assert(mc.get_multi(['abc', 'def', 'ghi', 'jkl']) ==
+           {'abc': 'love', 'ghi': 'it'})
+    print 'test get multi ok'
+
+    
 def test_performance():
     for _ in xrange(100):
         for i in xrange(100):
             mc.set('perf', i)
         for i in xrange(100):
             mc.get('perf')
-        
+
 if __name__ == '__main__':
     test_queue()
     test_timeout()
     test_reservation()
     test_reservation_close()
+    test_get_multi()
     test_server_error()
     test_performance()
     
