@@ -15,63 +15,68 @@ def get_mc():
     return mc
 mc = get_mc()
 
-def clean_cache(key):
+def take(key):
+    v = mc.get(key)
+    if v is not None:
+        mc.delete(key)
+    return v
+    
+def clean_queue(key):
+    mc.delete(key)
     while True:
-        if mc.get(key) is None:
+        if take(key) is None:
             break
 
 def test_queue():
-    clean_cache('abc/def')
+    clean_queue('abc/def')
     mc.set('abc/def', 'I')
     mc.set('abc/def', 'really')
     mc.set('abc/def', 'love')
     mc.set('abc/def', 'it')
 
-    assert(mc.get('abc/def') == 'I')
-    assert(mc.get('abc/def') == 'really')
-    assert(mc.get('abc/def') == 'love')
-    assert(mc.get('abc/def') == 'it')
-    assert(mc.get('abc/def') is None)
+    assert(take('abc/def') == 'I')
+    assert(take('abc/def') == 'really')
+    assert(take('abc/def') == 'love')
+    assert(take('abc/def') == 'it')
+    assert(take('abc/def') is None)
     print 'test queue ok'
 
 def test_timeout():
-    clean_cache('abc/def')
+    clean_queue('abc/def')
     mc.set('abc/def', 'I')
     mc.set('abc/def', 'really', 3) # time out is 3 seconds
     mc.set('abc/def', 'love')
     mc.set('abc/def', 'it')
 
     time.sleep(5)
-    assert(mc.get('abc/def') == 'I')
-    assert(mc.get('abc/def') == 'love')
-    assert(mc.get('abc/def') == 'it')
-    assert(mc.get('abc/def') is None)
+    assert(take('abc/def') == 'I')
+    assert(take('abc/def') == 'love')
+    assert(take('abc/def') == 'it')
+    assert(take('abc/def') is None)
     print 'test queue timeout ok'
 
 def test_reservation():
-    clean_cache('abc')
-    clean_cache('def')
+    clean_queue('abc')
+    clean_queue('def')
     mc.set('abc', 'I')
     mc.set('abc', 'really')
     mc.set('config:reserv', 1)
     assert(mc.get('abc') == 'I')
     assert(mc.get('abc') is None)
     mc.delete('abc')
-    mc.set('config:reserv', 0)
-    assert(mc.get('abc') == 'really')
+    assert(take('abc') == 'really')
     print 'test reservation ok'
 
 def test_reservation_close():
     global mc
-    clean_cache('abc')
+    clean_queue('abc')
     mc.set('abc', 'I')
     mc.set('abc', 'love')
-    mc.set('config:reserv', 1)
     assert(mc.get('abc') == 'I')
     mc.disconnect_all()
 
     mc = get_mc()
-    assert(mc.get('abc') == 'love')
+    assert(take('abc') == 'love')
     assert(mc.get('abc') == 'I')
     print 'test reservation on close ok'
 
@@ -86,26 +91,27 @@ def test_server_error():
     % python client_test.py
     I
     % python client_test.py
-    None    
+    love
+    ...
     """
     if sys.argv[1:] == ['send']:
         mc.set('xyz', 'I')
         mc.set('xyz', 'love')
-        mc.set('config:reserv', 1)
         print mc.get('xyz')
     else:
         print mc.get('xyz')
 
 def test_get_multi():
-    clean_cache('abc')
-    clean_cache('def')
-    clean_cache('ghi')
-    clean_cache('jkl')
+    clean_queue('abc')
+    clean_queue('def')
+    clean_queue('ghi')
+    clean_queue('jkl')
     
     mc.set('def', 'I')
     mc.set('abc', 'love')
     mc.set('ghi', 'it')
     assert(mc.get('def') == 'I')
+    #print mc.get_multi(['abc', 'def', 'ghi', 'jkl'])
     assert(mc.get_multi(['abc', 'def', 'ghi', 'jkl']) ==
            {'abc': 'love', 'ghi': 'it'})
     print 'test get multi ok'
@@ -116,15 +122,15 @@ def test_performance():
         for i in xrange(100):
             mc.set('perf', i)
         for i in xrange(100):
-            mc.get('perf')
+            take('perf')
 
 if __name__ == '__main__':
-    test_queue()
-    test_timeout()
-    test_reservation()
-    test_reservation_close()
-    test_get_multi()
+    #test_queue()
+    #test_timeout()
+    #test_reservation()
+    #test_reservation_close()
+    #test_get_multi()
     test_server_error()
-    test_performance()
+    #test_performance()
     
 

@@ -16,10 +16,11 @@ class Task(object):
     def __init__(self, factory):
         self.timeout = 0.02
         self.queue_factory = factory
+        self.prot_id = 'task:%s' % id(self)
 
     def check(self):
         q = self.queue_factory.get_queue(self.key)
-        t = q.take()
+        t = q.take(self.prot_id)
         if t is None:
             # time out increase with the null result
             self.timeout *= 1.5

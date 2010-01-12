@@ -53,15 +53,7 @@ class MemcacheProtocol(object):
             'set': self.handle_set,
             'delete': self.handle_delete}
         self.wait_for_line()
-        self.reservation = False
         self.resved_keys = set()
-
-    def set_reservation(self, value):
-        orig_reservation = self.reservation
-        self.reservation = value in ('1', 'true')
-        if orig_reservation != self.reservation:
-            logging.info('Set reservation to be %s' % self.reservation)
-            self.use_key()
 
     def use_key(self, key=None):
         """ Mark all reserved keys or the specified key as used """
@@ -96,34 +88,23 @@ class MemcacheProtocol(object):
         exptime = int(exptime)
         if exptime > 0:
             exptime = time.time() + exptime
-
         def on_set_data(data):
             data = data[:-2]
-            if key == 'config:reserv':
-                self.set_reservation(data)
-            else:
-                self.server.queue_factory.get_queue(key).give(exptime, data)
+            self.server.queue_factory.get_queue(key).give(exptime, data)
             self.stream.write('STORED\r\n')
             self.wait_for_line()
         self.stream.read_bytes(bytes + 2, on_set_data)
         return True
 
     def _get_data(self, key):
-        if self.reservation and (key in self.resved_keys):
+        if key in self.resved_keys:
             return None
-        prot_id = None
-        if self.reservation:
-            prot_id = self.protocol_id
         q = self.server.queue_factory.get_queue(key, auto_create=False)
         t = None
         if q:
-            if self.reservation:
-                t = q.reserve(prot_id=prot_id)
-            else:
-                t = q.take()
+            t = q.reserve(prot_id=self.protocol_id)
         if t:
-            if self.reservation:
-                self.resved_keys.add(key)
+            self.resved_keys.add(key)
             return t[1] # t is a tuple of (timeout, data)
 
     def handle_get(self, *keys):
@@ -147,7 +128,7 @@ class MemcacheProtocol(object):
     def handle_delete(self, key, *args):
         if key in self.resved_keys:
             self.use_key(key)
-            self.stream.write('DELETED\r\n')
+            self.stream.write('DLETED\r\n')
         else:
             self.stream.write('NOT_DELETED\r\n')
 

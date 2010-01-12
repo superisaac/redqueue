@@ -63,19 +63,11 @@ class Queue(object):
             self.borrowing[prot_id] = (timeout, data)
             return timeout, data
 
-    def take(self):
-        """ Take an element away and never return it
-        """
-        while True:
-            try:
-                timeout, data = self._queue.pop()
-            except IndexError:
-                return None
-            self.addlog('G\r\n')
-            self.rotate_log()
-            if timeout > 0 and timeout < time.time():
-                continue
-            return timeout, data
+    def take(self, prot_id):
+        t = self.reserve(prot_id)
+        if t is not None:
+            self.use(prot_id)
+        return t
 
     def load_from_log(self, logpath):
         logfile = open(logpath, 'rb')
@@ -83,27 +75,22 @@ class Queue(object):
             line = logfile.readline()
             if not line:
                 break
-            if line.startswith('B'):
+            if line.startswith('B'): # Borrow an item
                 _, prot_id = line.split()
                 try:
                     data = self._queue.pop()
                     self.borrowing[prot_id] = data
                 except IndexError:
                     logging.error('Pop from empty stack')
-            elif line.startswith('U'):
+            elif line.startswith('U'):  # Use an item
                 _, prot_id = line.split()
                 assert prot_id in self.borrowing
                 del self.borrowing[prot_id]
-            elif line.startswith('R'):
+            elif line.startswith('R'):  # Return an item
                 _, prot_id = line.split()
                 assert prot_id in self.borrowing
                 t = self.borrowing.pop(prot_id)
                 self._queue.appendleft(t)
-            elif line.startswith('G'):
-                try:
-                    self._queue.pop()
-                except IndexError:
-                    logging.error('Pop from empty stack')
             elif line.startswith('S'):
                 t, timeout, lendata = line.split()
                 data = logfile.read(int(lendata))
