@@ -26,15 +26,11 @@ Redqueue is free and unencumbered public domain software.
  % redqueue_server.py --help
 
 == Reserve/delete mode
-   Now the program is able to behave like beanstalk to handle client crash, yet it uses memcached protocol
-    >>> mc.set('abc', 123)
-    >>> mc.set('config:reserv', 1)
-    >>> mc.get('abc')
-    >>> mc.get('abc')  # It must be None
-    >>> mc.delete('abc')
-
-    If client crashed or even server crashed, the key 'abc''s value
-    123 is recycled again to queue.
+   Reserve/delete mode is currently the sole mode, once an item is fetched, a delete request must be send later to mark the item is used, or else the item will be recycled back later.
+   >>> mc.set('abc', '123')
+   >>> v = mc.get('abc')
+   >>> if v is not None:
+   >>>     mc.delete('abc')  
 
 
 
