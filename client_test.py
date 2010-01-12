@@ -9,7 +9,9 @@
 ####################################################################
 import sys, os
 import time
+import logging
 import memcache
+logging.basicConfig(stream=sys.stdout)
 def get_mc():
     mc = memcache.Client(['127.0.0.1:12345'])
     return mc
@@ -28,12 +30,11 @@ def clean_queue(key):
             break
 
 def test_queue():
-    clean_queue('abc/def')
+    #clean_queue('abc/def')
     mc.set('abc/def', 'I')
     mc.set('abc/def', 'really')
     mc.set('abc/def', 'love')
     mc.set('abc/def', 'it')
-
     assert(take('abc/def') == 'I')
     assert(take('abc/def') == 'really')
     assert(take('abc/def') == 'love')
@@ -116,6 +117,18 @@ def test_get_multi():
            {'abc': 'love', 'ghi': 'it'})
     print 'test get multi ok'
 
+def test_delete_multi():
+    clean_queue('abc')
+    clean_queue('def')
+    clean_queue('ghi')
+    clean_queue('jkl')
+
+    mc.set('def', 'I')
+    mc.set('abc', 'love')
+    assert(mc.get('def') == 'I')
+    mc.delete_multi(['abc', 'def', 'ghi', 'jkl'])
+    assert(mc.get_multi(['abc', 'def', 'ghi', 'jkl']) ==
+           {'abc': 'love'})
     
 def test_performance():
     for _ in xrange(100):
@@ -125,11 +138,12 @@ def test_performance():
             take('perf')
 
 if __name__ == '__main__':
-    #test_queue()
-    #test_timeout()
-    #test_reservation()
-    #test_reservation_close()
-    #test_get_multi()
+    test_queue()
+    test_timeout()
+    test_reservation()
+    test_reservation_close()
+    test_get_multi()
+    test_delete_multi()
     test_server_error()
     #test_performance()
     

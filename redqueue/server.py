@@ -33,7 +33,7 @@ class MemcacheServer(object):
         p.server = self
 
     def start(self, host, port):
-        self.queue_factory.scan_logs()
+        self.queue_factory.scan_journals()
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
         self._sock.setblocking(0)
         self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
