@@ -26,6 +26,11 @@ class MemcacheServer(object):
                 ReliableQueue.addlog = ReliableQueue.addlog_sync
         else:
             self.queue_factory.queue_class = Queue
+        self.watchers = {}
+
+    def notify(self, key):
+        if key in self.watchers:
+            ioloop.IOLoop.instance().add_callback(self.watchers[key].check)
 
     def handle_accept(self, fd, events):
         conn, addr = self._sock.accept()
@@ -90,9 +95,11 @@ class MemcacheProtocol(object):
             exptime = time.time() + exptime
         def on_set_data(data):
             data = data[:-2]
-            self.server.queue_factory.get_queue(key).give(exptime, data)
+            q = self.server.queue_factory.get_queue(key)
+            q.give(exptime, data)
             self.stream.write('STORED\r\n')
             self.wait_for_line()
+            self.server.notify(key)
         self.stream.read_bytes(bytes + 2, on_set_data)
         return True
 
