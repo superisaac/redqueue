@@ -1,6 +1,8 @@
 import random
 import time
 import logging
+import urllib
+
 try:
     import json
 except ImportError:
@@ -52,10 +54,12 @@ class URLFetchTask(Task):
         if isinstance(data, basestring):
             url = data
             delay = 0
+            method = 'GET'
         else: # data should be a dictionary
             url = data['url']
             delay = data.get('delay', 0)
-
+            method = data.get('method', 'GET')
+            
         def handle_response(response):
             if response.error:
                 logging.error('Error %s while fetch url %s' % (response.error,
@@ -66,7 +70,12 @@ class URLFetchTask(Task):
         def fetch_url(url):
             logging.info('Fetching url %s' % url)
             http_client = AsyncHTTPClient()
-            http_client.fetch(url, handle_response)
+            if method == 'POST':
+                postdata = urllib.urlencode(data.get('body', {}))
+            else:
+                postdata = None
+            http_client.fetch(url, handle_response,
+                              method=method, body=postdata)
 
         if delay:
             ioloop.IOLoop.instance().add_timeout(time.time() + delay,
